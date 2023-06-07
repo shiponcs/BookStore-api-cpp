@@ -1,12 +1,21 @@
 #include <pistache/endpoint.h>
 #include <pistache/http.h>
 #include <pistache/router.h>
-
+#include <map>
 #include "rapidjson/document.h"
-
+#include "rapidjson/writer.h"
+#include "rapidjson/stringbuffer.h"
 #include <iostream>
 
 using namespace Pistache;
+
+struct Book{
+	int id;
+	std::string name;
+	std::string author;
+};
+
+std::map< int, Book > db;
 
 void hello(const Rest::Request& request, Http::ResponseWriter response) 
 {
@@ -28,19 +37,31 @@ void echo(const Rest::Request& req, Http::ResponseWriter resp)
 }
 
 void createBook(const Rest::Request& req, Http::ResponseWriter resp){
-	std::string id = req.param(":id").as<std::string>();
-	std::cout << id << "\n";
+//	std::size_t id = req.param(":id").as<std::size_t>();
+//	std::cout << id << "\n";
 	rapidjson::Document doc;
 	doc.Parse(req.body().c_str());
 	std::string name = doc["name"].GetString();
-	std::cout << name << "\n";
-
-	resp.send(Http::Code::Ok);
+	std::string author = doc["author"].GetString();
+	int id = doc["id"].GetInt();
+	Book book;
+	book.id = id, book.name = name, book.author = author;
+	db[id] = book;
+	auto bookn = db[id];
+	std::cout << bookn.name << " " << bookn.author << " " << bookn.id << "\n";
+	resp.send(Http::Code::Ok, "Book entry created", MIME(Application, Plain));
 }
 
 void getBooks(const Rest::Request& req, Http::ResponseWriter resp){
-	
-	resp.send(Http::Code::Ok);
+	using namespace rapidjson;
+	const char* json = "{\"name\":\"Joe\",\"grade\":\"A\"}";
+	Document d;
+	d.Parse(json);
+	StringBuffer buffer;
+	Writer<StringBuffer> writer(buffer);
+	d.Accept(writer);
+	std::cout << buffer.GetString() << std::endl;
+	resp.send(Http::Code::Ok, buffer.GetString(), MIME(Application, Json));
 }
 
 int main(int argc, char* argv[]) 
@@ -56,7 +77,7 @@ int main(int argc, char* argv[])
 
     Routes::Get(router, "/hello", Routes::bind(&hello));
     Routes::Post(router, "/echo", Routes::bind(&echo));
-    Routes::Post(router, "/books/:id", Routes::bind(&createBook));
+    Routes::Post(router, "/books", Routes::bind(&createBook));
     Routes::Get(router, "/books", Routes::bind(&getBooks));
     Routes::Get(router, "/echo_get/:text?", Routes::bind(&echo_get));
 
