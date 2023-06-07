@@ -50,7 +50,7 @@ void createBook(const Rest::Request& req, Http::ResponseWriter resp){
 	db[id] = book;
 	auto bookn = db[id];
 	std::cout << bookn.name << " " << bookn.author << " " << bookn.id << "\n";
-	resp.send(Http::Code::Ok, "Book entry created", MIME(Application, Plain));
+	resp.send(Http::Code::Ok, "Book entry created\n", MIME(Application, Plain));
 }
 
 void getBooks(const Rest::Request& req, Http::ResponseWriter resp){
