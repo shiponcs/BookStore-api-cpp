@@ -5,6 +5,7 @@
 #include "rapidjson/document.h"
 #include "rapidjson/writer.h"
 #include "rapidjson/stringbuffer.h"
+#include "rapidjson/prettywriter.h"
 #include <iostream>
 
 using namespace Pistache;
@@ -64,12 +65,33 @@ void getBooks(const Rest::Request& req, Http::ResponseWriter resp){
 	resp.send(Http::Code::Ok, buffer.GetString(), MIME(Application, Json));
 }
 
+void getBookById(const Rest::Request& req, Http::ResponseWriter resp){
+	std::size_t id = req.param(":id").as<std::size_t>();
+	auto book = db[id];
+	std::cout << book.name << " " << book.author << " " << book.id << "\n";
+
+	// serialize the book object (hard part)
+	rapidjson::StringBuffer strbuf;
+	rapidjson::PrettyWriter<rapidjson::StringBuffer> writer(strbuf);
+	
+	writer.StartObject();
+	writer.Key("name");
+	writer.String(book.name.c_str());
+	writer.Key("author");
+	writer.String(book.author.c_str());
+	writer.Key("id");
+	writer.Int(id);
+	writer.EndObject();
+	std::cout << strbuf.GetString() << std::endl;
+	resp.send(Http::Code::Ok, strbuf.GetString(),  MIME(Application, Json));
+}
+
 int main(int argc, char* argv[]) 
 {
     using namespace Rest;
 
-    Router router;      // POST/GET/etc. route handler
-    Port port(9900);    // port to listen on
+    Router router;     
+    Port port(9900);
     Address addr(Ipv4::any(), port);
     std::shared_ptr<Http::Endpoint> endpoint = std::make_shared<Http::Endpoint>(addr);
     auto opts = Http::Endpoint::options().threads(1);   // how many threads for the server
@@ -79,6 +101,7 @@ int main(int argc, char* argv[])
     Routes::Post(router, "/echo", Routes::bind(&echo));
     Routes::Post(router, "/books", Routes::bind(&createBook));
     Routes::Get(router, "/books", Routes::bind(&getBooks));
+    Routes::Get(router, "/books/:id", Routes::bind(&getBookById));
     Routes::Get(router, "/echo_get/:text?", Routes::bind(&echo_get));
 
     endpoint->setHandler(router.handler());
