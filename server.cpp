@@ -8,7 +8,9 @@
 #include "rapidjson/stringbuffer.h"
 #include "rapidjson/prettywriter.h"
 #include <iostream>
-
+#include <string.h>
+#include <cstdlib>
+#include "base64.h"
 using namespace Pistache;
 
 struct Book{
@@ -42,19 +44,24 @@ void createBook(const Rest::Request& req, Http::ResponseWriter resp){
 //	std::size_t id = req.param(":id").as<std::size_t>();
 //	std::cout << id << "\n";
 //
-
+ 
 //	for(const auto &[HeaderKey, RawHeader] : req.headers().rawList())
 //	        std::cout << HeaderKey << ": " << RawHeader.value() << std::endl;
 	try{
-		auto username = req.headers().getRaw("username").value();
-		auto password = req.headers().getRaw("password").value();
-		if(username != "admin" || password != "admin") { /*not admin*/
+		auto basicAuth = req.headers().getRaw("Authorization").value();
+		auto encoded = basicAuth.substr(basicAuth.find(" ") + 1);
+		
+		auto decoded = base64_decode(encoded);
+
+		std::cout << decoded << std::endl;
+		if(decoded != "admin:admin") { /*not admin*/
 			resp.send(Http::Code::Forbidden, "You are not allowed to do this\n");
+			return;
 		}
-		std::cout << username << " " << password  << std::endl;
 	}catch(...){
 		std::cout << "Unauthorized\n";
 		resp.send(Http::Code::Unauthorized);
+		return;
 	}
 	
 
@@ -62,9 +69,13 @@ void createBook(const Rest::Request& req, Http::ResponseWriter resp){
 	doc.Parse(req.body().c_str());
 	std::string name = doc["name"].GetString();
 	std::string author = doc["author"].GetString();
-	int id = doc["id"].GetInt();
-	Book book;
-	book.id = id, book.name = name, book.author = author;
+	int id = rand();
+	srand((unsigned) time(NULL));
+	Book book = {
+		.id = id,
+		.name = name,
+		.author = author,
+	};
 	db[id] = book;
 	auto bookn = db[id];
 	std::cout << bookn.name << " " << bookn.author << " " << bookn.id << "\n";
@@ -127,12 +138,30 @@ void getBookById(const Rest::Request& req, Http::ResponseWriter resp){
 
 
 void updateBookById(const Rest::Request& req, Http::ResponseWriter resp){
+
+	try{
+		auto basicAuth = req.headers().getRaw("Authorization").value();
+		auto encoded = basicAuth.substr(basicAuth.find(" ") + 1);
+		
+		auto decoded = base64_decode(encoded);
+
+		std::cout << decoded << std::endl;
+		if(decoded != "admin:admin") { /*not admin*/
+			resp.send(Http::Code::Forbidden, "You are not allowed to do this\n");
+			return;
+		}
+	}catch(...){
+		std::cout << "Unauthorized\n";
+		resp.send(Http::Code::Unauthorized);
+		return;
+	}
+	
+
 	std::size_t id = req.param(":id").as<std::size_t>();
 	if(db.find(id) == db.end()) {
 		resp.send(Http::Code::Not_Found, "Not Found");
 	}
 
-	
 	rapidjson::Document doc;
 	doc.Parse(req.body().c_str());
 	std::string name = doc["name"].GetString();
@@ -146,6 +175,38 @@ void updateBookById(const Rest::Request& req, Http::ResponseWriter resp){
 	std::cout << book.name << " " << book.author << " " << book.id << "\n";
 	
 	resp.send(Http::Code::Ok, "updated");
+}
+
+
+void deleteBookById(const Rest::Request& req, Http::ResponseWriter resp){
+	
+	
+	try{
+		auto basicAuth = req.headers().getRaw("Authorization").value();
+		auto encoded = basicAuth.substr(basicAuth.find(" ") + 1);
+		
+		auto decoded = base64_decode(encoded);
+
+		std::cout << decoded << std::endl;
+		if(decoded != "admin:admin") { /*not admin*/
+			resp.send(Http::Code::Forbidden, "You are not allowed to do this\n");
+			return;
+		}
+	}catch(...){
+		std::cout << "Unauthorized\n";
+		resp.send(Http::Code::Unauthorized);
+		return;
+	}
+	
+	
+	std::size_t id = req.param(":id").as<std::size_t>();
+	if(db.find(id) == db.end()) {
+		resp.send(Http::Code::Not_Found, "Not Found");
+	}
+
+	db.erase(id);
+	
+	resp.send(Http::Code::Ok, "Deleted");
 }
 
 
@@ -166,6 +227,8 @@ int main(int argc, char* argv[])
     Routes::Get(router, "/books", Routes::bind(&getBooks));
     Routes::Get(router, "/books/:id", Routes::bind(&getBookById));
     Routes::Put(router, "/books/:id", Routes::bind(&updateBookById));
+    Routes::Delete(router, "/books/:id", Routes::bind(&deleteBookById));
+
     Routes::Get(router, "/echo_get/:text?", Routes::bind(&echo_get));
 
     endpoint->setHandler(router.handler());
