@@ -125,6 +125,30 @@ void getBookById(const Rest::Request& req, Http::ResponseWriter resp){
 	resp.send(Http::Code::Ok, strbuf.GetString(),  MIME(Application, Json));
 }
 
+
+void updateBookById(const Rest::Request& req, Http::ResponseWriter resp){
+	std::size_t id = req.param(":id").as<std::size_t>();
+	if(db.find(id) == db.end()) {
+		resp.send(Http::Code::Not_Found, "Not Found");
+	}
+
+	
+	rapidjson::Document doc;
+	doc.Parse(req.body().c_str());
+	std::string name = doc["name"].GetString();
+	std::string author = doc["author"].GetString();
+	Book book = {
+		.id = id,
+		.name = name,
+		.author = author,
+	};
+	db[id] = book;
+	std::cout << book.name << " " << book.author << " " << book.id << "\n";
+	
+	resp.send(Http::Code::Ok, "updated");
+}
+
+
 int main(int argc, char* argv[]) 
 {
     using namespace Rest;
@@ -141,6 +165,7 @@ int main(int argc, char* argv[])
     Routes::Post(router, "/books", Routes::bind(&createBook));
     Routes::Get(router, "/books", Routes::bind(&getBooks));
     Routes::Get(router, "/books/:id", Routes::bind(&getBookById));
+    Routes::Put(router, "/books/:id", Routes::bind(&updateBookById));
     Routes::Get(router, "/echo_get/:text?", Routes::bind(&echo_get));
 
     endpoint->setHandler(router.handler());
