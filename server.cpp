@@ -1,3 +1,4 @@
+#define RAPIDJSON_HAS_STDSTRING 1
 #include <pistache/endpoint.h>
 #include <pistache/http.h>
 #include <pistache/router.h>
@@ -40,6 +41,23 @@ void echo(const Rest::Request& req, Http::ResponseWriter resp)
 void createBook(const Rest::Request& req, Http::ResponseWriter resp){
 //	std::size_t id = req.param(":id").as<std::size_t>();
 //	std::cout << id << "\n";
+//
+
+//	for(const auto &[HeaderKey, RawHeader] : req.headers().rawList())
+//	        std::cout << HeaderKey << ": " << RawHeader.value() << std::endl;
+	try{
+		auto username = req.headers().getRaw("username").value();
+		auto password = req.headers().getRaw("password").value();
+		if(username != "admin" || password != "admin") { /*not admin*/
+			resp.send(Http::Code::Forbidden, "You are not allowed to do this\n");
+		}
+		std::cout << username << " " << password  << std::endl;
+	}catch(...){
+		std::cout << "Unauthorized\n";
+		resp.send(Http::Code::Unauthorized);
+	}
+	
+
 	rapidjson::Document doc;
 	doc.Parse(req.body().c_str());
 	std::string name = doc["name"].GetString();
@@ -56,18 +74,39 @@ void createBook(const Rest::Request& req, Http::ResponseWriter resp){
 void getBooks(const Rest::Request& req, Http::ResponseWriter resp){
 	using namespace rapidjson;
 	const char* json = "{\"name\":\"Joe\",\"grade\":\"A\"}";
-	Document d;
-	d.Parse(json);
+	Document jsonDoc;
+	jsonDoc.SetObject();
+	Value myArray(rapidjson::kArrayType);
+	
+
+	for(auto const& entry: db){
+		Value objValue;
+		objValue.SetObject();
+		const char* v = entry.second.name.c_str(); 
+		objValue.AddMember( "name",  entry.second.name, jsonDoc.GetAllocator() );
+		objValue.AddMember( "author", entry.second.author, jsonDoc.GetAllocator() );
+		objValue.AddMember( "id", entry.second.id, jsonDoc.GetAllocator() );
+
+		myArray.PushBack(objValue, jsonDoc.GetAllocator() );
+		std::cout << v << std::endl;
+	
+	}
+	jsonDoc.AddMember("allbooks", myArray, jsonDoc.GetAllocator());
+	jsonDoc.AddMember("total", db.size(), jsonDoc.GetAllocator());
 	StringBuffer buffer;
 	Writer<StringBuffer> writer(buffer);
-	d.Accept(writer);
+	jsonDoc.Accept(writer);
 	std::cout << buffer.GetString() << std::endl;
 	resp.send(Http::Code::Ok, buffer.GetString(), MIME(Application, Json));
 }
 
 void getBookById(const Rest::Request& req, Http::ResponseWriter resp){
 	std::size_t id = req.param(":id").as<std::size_t>();
+	if(db.find(id) == db.end()) {
+		resp.send(Http::Code::Not_Found, "Not Found");
+	}
 	auto book = db[id];
+
 	std::cout << book.name << " " << book.author << " " << book.id << "\n";
 
 	// serialize the book object (hard part)
@@ -80,7 +119,7 @@ void getBookById(const Rest::Request& req, Http::ResponseWriter resp){
 	writer.Key("author");
 	writer.String(book.author.c_str());
 	writer.Key("id");
-	writer.Int(id);
+	writer.Int(book.id);
 	writer.EndObject();
 	std::cout << strbuf.GetString() << std::endl;
 	resp.send(Http::Code::Ok, strbuf.GetString(),  MIME(Application, Json));
