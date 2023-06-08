@@ -1,17 +1,17 @@
 # BookStore-api-cpp
 
-Developed using [pistache](https://pistacheio.github.io/pistache/docs/rest-description/) and [rapidjson](https://rapidjson.org/).
+Developed using [pistache](https://pistacheio.github.io/pistache/docs/rest-description/) and [rapidjson](https://rapidjson.org/). It uses `basic auth`. 
 
 #### Build:
 
 ```bash
-g++ server.cpp -o server -lpistache
+g++ server.cpp base64.cpp -o server -lpistache
 ```
 
 #### Run
 
 ```bash
-./server
+./server 9900
 ```
 
 
