@@ -21,29 +21,8 @@ struct Book{
 
 std::map< int, Book > db;
 
-void hello(const Rest::Request& request, Http::ResponseWriter response) 
-{
-    response.send(Http::Code::Ok, "world!");
-}
-
-void echo_get(const Rest::Request& req, Http::ResponseWriter resp) 
-{
-    std::string text = req.hasParam(":text") ? req.param(":text").as<std::string>() : "No parameter supplied.";
-    resp.send(Http::Code::Ok, text);
-}
-
-void echo(const Rest::Request& req, Http::ResponseWriter resp) 
-{
-    rapidjson::Document doc;
-    doc.Parse(req.body().c_str());
-    std::string responseString = doc.HasMember("text") ? doc["text"].GetString() : "No text parameter supplied in JSON:\n" + req.body();
-    resp.send(Http::Code::Ok, responseString);
-}
 
 void createBook(const Rest::Request& req, Http::ResponseWriter resp){
-//	std::size_t id = req.param(":id").as<std::size_t>();
-//	std::cout << id << "\n";
-//
  
 //	for(const auto &[HeaderKey, RawHeader] : req.headers().rawList())
 //	        std::cout << HeaderKey << ": " << RawHeader.value() << std::endl;
@@ -212,25 +191,25 @@ void deleteBookById(const Rest::Request& req, Http::ResponseWriter resp){
 
 int main(int argc, char* argv[]) 
 {
-    using namespace Rest;
+	if(argc < 2){
+		std::cout << "Usage: ./server <port>\n";
+		return 0;
+	}
+    	using namespace Rest;
+    	Router router;     
+    	Port port(std::stoi(argv[1]));
+    	Address addr(Ipv4::any(), port);
+    	std::shared_ptr<Http::Endpoint> endpoint = std::make_shared<Http::Endpoint>(addr);
+    	auto opts = Http::Endpoint::options().threads(1);   
+    	endpoint->init(opts);
 
-    Router router;     
-    Port port(9900);
-    Address addr(Ipv4::any(), port);
-    std::shared_ptr<Http::Endpoint> endpoint = std::make_shared<Http::Endpoint>(addr);
-    auto opts = Http::Endpoint::options().threads(1);   // how many threads for the server
-    endpoint->init(opts);
+    	Routes::Post(router, "/books", Routes::bind(&createBook));
+    	Routes::Get(router, "/books", Routes::bind(&getBooks));
+    	Routes::Get(router, "/books/:id", Routes::bind(&getBookById));
+    	Routes::Put(router, "/books/:id", Routes::bind(&updateBookById));
+    	Routes::Delete(router, "/books/:id", Routes::bind(&deleteBookById));
 
-    Routes::Get(router, "/hello", Routes::bind(&hello));
-    Routes::Post(router, "/echo", Routes::bind(&echo));
-    Routes::Post(router, "/books", Routes::bind(&createBook));
-    Routes::Get(router, "/books", Routes::bind(&getBooks));
-    Routes::Get(router, "/books/:id", Routes::bind(&getBookById));
-    Routes::Put(router, "/books/:id", Routes::bind(&updateBookById));
-    Routes::Delete(router, "/books/:id", Routes::bind(&deleteBookById));
 
-    Routes::Get(router, "/echo_get/:text?", Routes::bind(&echo_get));
-
-    endpoint->setHandler(router.handler());
-    endpoint->serve();
+    	endpoint->setHandler(router.handler());
+    	endpoint->serve();
 }
